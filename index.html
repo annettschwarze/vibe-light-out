@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Encryption Protolock</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #0b1419;
+      color: #e6e6e6;
+    }
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+      border: 20px solid #3a4c56;
+      border-radius: 15px;
+      padding: 40px;
+      background-color: #162329;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+    }
+
+    /* General SVG triangle styles */
+    svg.corner {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Top-left triangle */
+    svg.corner.top-left {
+      top: 0;
+      left: 0;
+    }
+
+    /* Top-right triangle */
+    svg.corner.top-right {
+      top: 0;
+      right: 0;
+    }
+
+    /* Bottom-left triangle */
+    svg.corner.bottom-left {
+      bottom: 0;
+      left: 0;
+    }
+
+    /* Bottom-right triangle */
+    svg.corner.bottom-right {
+      bottom: 0;
+      right: 0;
+    }
+
+    .title {
+      font-size: 28px;
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: #e6e6e6;
+      text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+    }
+
+    .subtitle {
+      font-size: 16px;
+      margin-bottom: 20px;
+      color: #8ba3b0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 70px);
+      gap: 8px;
+      margin: 15px 0;
+    }
+
+    .tile {
+      width: 64px;
+      height: 64px;
+      background-color: #4d7a93;
+      border: 3px solid #76c7e6;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #162329;
+      transition: all 0.3s ease;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(118, 199, 230, 0.3);
+    }
+
+    .tile.dim {
+      background-color: #293841;
+      color: #56727c;
+      border-color: #3a5563;
+      box-shadow: none;
+    }
+
+    .message {
+      color: #76c7e6;
+      font-size: 1.5rem;
+      margin: 15px 0;
+      text-align: center;
+      min-height: 35px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 12px 25px;
+      background-color: #1a5e8a;
+      color: white;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+      border: 1px solid #76c7e6;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #247bad;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0px);
+    }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <!-- Top-left triangle -->
+  <svg class="corner top-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polygon points="0,0 100,0 0,100" fill="#00b347" />
+  </svg>
+
+  <!-- Top-right triangle -->
+  <svg class="corner top-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polygon points="100,0 100,100 0,0" fill="#00b347" />
+  </svg>
+
+  <!-- Bottom-left triangle -->
+  <svg class="corner bottom-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polygon points="0,100 100,100 0,0" fill="#00b347" />
+  </svg>
+
+  <!-- Bottom-right triangle -->
+  <svg class="corner bottom-right" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polygon points="100,100 0,100 100,0" fill="#00b347" />
+  </svg>
+
+  <div class="title">ENCRYPTION PROTOLOCK</div>
+  <div class="subtitle">SECURE ENCRYPTION MODULE v2.4</div>
+
+  <div class="grid" id="grid"></div>
+  <div class="message" id="message">Click tiles to solve the puzzle...</div>
+  <div class="controls">
+    <button id="reset">Reset</button>
+    <button id="solve">Solve</button>
+  </div>
+</div>
+
+<script>
+  const GRID_SIZE = 5;
+  const gridElement = document.getElementById('grid');
+  const messageElement = document.getElementById('message');
+  const resetButton = document.getElementById('reset');
+  const solveButton = document.getElementById('solve');
+
+  // Create the game grid
+  let grid = [];
+
+  // Initialize the grid by starting from a clean grid and applying random moves
+  function initializeGrid() {
+    // Start with a clean grid (all tiles dim)
+    grid = Array.from({ length: GRID_SIZE }, () =>
+            Array.from({ length: GRID_SIZE }, () => 0)
+    );
+
+    // Apply a number of random moves to make it solvable
+    const scrambleMoves = Math.floor(Math.random() * 10) + 10; // Between 10 and 20 random moves
+    for (let i = 0; i < scrambleMoves; i++) {
+      const randomRow = Math.floor(Math.random() * GRID_SIZE);
+      const randomCol = Math.floor(Math.random() * GRID_SIZE);
+      toggleTile(randomRow, randomCol, false); // Generate random moves without rendering after each move
+    }
+
+    renderGrid();
+  }
+
+  // Render the grid
+  function renderGrid() {
+    gridElement.innerHTML = '';
+    grid.forEach((row, rowIndex) =>
+            row.forEach((cell, colIndex) => {
+              const tile = document.createElement('div');
+              tile.classList.add('tile');
+              if (cell === 0) {
+                tile.classList.add('dim');
+              }
+              tile.addEventListener('click', () => toggleTile(rowIndex, colIndex, true));
+              gridElement.appendChild(tile);
+            })
+    );
+    checkWinCondition();
+  }
+
+  // Toggle a tile and its neighbors
+  function toggleTile(row, col, render = true) {
+    const directions = [
+      [0, 0], // Current tile
+      [-1, 0], // Above
+      [1, 0], // Below
+      [0, -1], // Left
+      [0, 1], // Right
+    ];
+    directions.forEach(([dx, dy]) => {
+      const newRow = row + dx;
+      const newCol = col + dy;
+      if (
+              newRow >= 0 &&
+              newRow < GRID_SIZE &&
+              newCol >= 0 &&
+              newCol < GRID_SIZE
+      ) {
+        grid[newRow][newCol] = grid[newRow][newCol] === 0 ? 1 : 0;
+      }
+    });
+
+    if (render) renderGrid();
+  }
+
+  // Check if the grid is in the solved state
+  function checkWinCondition() {
+    const isWin = grid.every(row => row.every(cell => cell === 0));
+    if (isWin) {
+      messageElement.textContent = "ENCRYPTION OVERRIDE SUCCESSFUL!";
+      messageElement.style.color = "#00ff00";
+    } else {
+      messageElement.textContent = "Solving encryption pattern...";
+      messageElement.style.color = "#76c7e6";
+    }
+  }
+
+  // Solve the puzzle
+  function solvePuzzle() {
+    const moves = findSolution();
+    if (!moves) {
+      alert('No solution found!');
+      return;
+    }
+    for (let i = 0; i < moves.length; i++) {
+      const [row, col] = moves[i];
+      setTimeout(() => toggleTile(row, col, true), i * 500);
+    }
+  }
+
+  // Brute force solver
+  function findSolution() {
+    const size = GRID_SIZE * GRID_SIZE;
+    const solvedState = Array.from({ length: GRID_SIZE }, () =>
+            Array.from({ length: GRID_SIZE }, () => 0)
+    );
+
+    for (let mask = 0; mask < (1 << size); mask++) {
+      let testGrid = grid.map(row => row.slice());
+      let moves = [];
+      for (let bit = 0; bit < size; bit++) {
+        if (mask & (1 << bit)) {
+          const row = Math.floor(bit / GRID_SIZE);
+          const col = bit % GRID_SIZE;
+          toggleTileInternal(testGrid, row, col);
+          moves.push([row, col]);
+        }
+      }
+      if (JSON.stringify(testGrid) === JSON.stringify(solvedState)) {
+        return moves;
+      }
+    }
+    return null;
+  }
+
+  // Internal toggle for brute force testing
+  function toggleTileInternal(testGrid, row, col) {
+    const directions = [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    directions.forEach(([dx, dy]) => {
+      const newRow = row + dx;
+      const newCol = col + dy;
+      if (
+              newRow >= 0 &&
+              newRow < GRID_SIZE &&
+              newCol >= 0 &&
+              newCol < GRID_SIZE
+      ) {
+        testGrid[newRow][newCol] = testGrid[newRow][newCol] === 0 ? 1 : 0;
+      }
+    });
+  }
+
+  // Event listeners
+  resetButton.addEventListener('click', initializeGrid);
+  solveButton.addEventListener('click', solvePuzzle);
+
+  // Initialize the game
+  initializeGrid();
+</script>
+</body>
+</html>
